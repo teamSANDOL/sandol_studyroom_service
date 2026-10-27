@@ -33,6 +33,7 @@
 | 422 | (FastAPI 기본 형식) | 좌석 번호가 1자리부터 4자리 숫자가 아니다 |
 | 502 | `school_unavailable` | 학교 서버 연결 실패, timeout, HTTP 오류 |
 | 502 | `school_response_invalid` | 학교 응답이 JSON이 아니거나 필드가 빠졌거나 집계가 맞지 않는다 |
+| 503 | `history_unavailable` | 수집 또는 DB 연결이 꺼져 혼잡도 이력을 줄 수 없다 |
 
 ### 값 정의
 
@@ -119,6 +120,84 @@
   "roomCode": "A1",
   "updatedAt": "2026-10-13T07:18:32Z",
   "seat": { "number": "3", "name": "A1-003", "status": "occupied", "sourceStatus": "U", "remainingMinutes": 187, "estimatedEndAt": "2026-10-13T10:25:32Z" }
+}
+```
+
+## 혼잡도 이력
+
+수집한 관측을 일간, 주간, 월간으로 집계한다. 세 경로 모두 공통 메타데이터와 요약(`summary`)을 가진다. 수집이나 DB 연결이 꺼져 있으면 503 `history_unavailable`이다.
+
+시간 구간은 한국 시각 기준이다. `date` 질의는 `YYYY-MM-DD`이며, 생략하면 한국 시각 오늘이다.
+
+### 공통 필드
+
+| 필드 | 뜻 |
+|---|---|
+| `firstDate` | 가장 이른 관측 날짜. 없으면 `null` |
+| `intervalSeconds` | 수집 주기(초) |
+| `retentionDays` | 보관 기간(일) |
+| `lastStoredAt` | 마지막 적재 시각(UTC). 없으면 `null` |
+| `collectionError` | 마지막 수집 오류 코드. 없으면 `null` |
+| `collectionDelayed` | 마지막 적재가 지연 기준보다 오래됐으면 `true` |
+| `updatedAt` | 응답 생성 시각(UTC) |
+
+각 구간은 `{ "percent": 0~100 또는 null, "samples": 표본 수, "reason": 사유 또는 null }`이다. `percent`가 있으면 `reason`은 `null`이고 `samples`는 1 이상이다. 사유가 있으면 `percent`는 `null`, `samples`는 0이다.
+
+| `reason` | 상황 |
+|---|---|
+| `closed` | 관측은 있으나 모두 휴실 상태다 |
+| `missing` | 보관 범위 안인데 관측이 없다 |
+| `future` | 아직 오지 않은 구간이다 |
+| `outside_retention` | 보관 기간 밖이거나 수집 시작 이전이다(주간, 월간만) |
+
+`percent`는 개실 상태 관측의 사용률(`used / total`) 평균을 반올림한 값이다.
+
+## GET /studyroom/api/readingrooms/{code}/history/daily
+
+기준 날짜의 요약과 24개 시간별(`hours`, 0시부터 23시) 사용률을 반환한다. `lastAt`은 그날 마지막 관측 시각이다.
+
+```json
+{
+  "firstDate": "2026-10-19", "intervalSeconds": 180, "retentionDays": 90,
+  "lastStoredAt": "2026-10-27T12:50:00Z", "collectionError": null,
+  "collectionDelayed": false, "updatedAt": "2026-10-27T13:00:00Z",
+  "room": "A1", "date": "2026-10-27", "lastAt": "2026-10-27T12:50:00Z",
+  "summary": { "percent": 65, "samples": 84, "reason": null },
+  "hours": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed" } ]
+}
+```
+
+## GET /studyroom/api/readingrooms/{code}/history/weekly
+
+기준 날짜가 속한 월요일부터 일요일까지를 반환한다. `days`는 7개이고, 각 요일은 `summary`와 12개 두 시간 구간(`slots`, 0, 2, ... , 22시 시작)을 가진다.
+
+```json
+{
+  "room": "A1", "date": "2026-10-27",
+  "weekStart": "2026-10-26", "weekEnd": "2026-11-01",
+  "summary": { "percent": 61, "samples": 900, "reason": null },
+  "days": [
+    {
+      "date": "2026-10-26",
+      "summary": { "percent": 58, "samples": 120, "reason": null },
+      "lastAt": "2026-10-26T12:50:00Z",
+      "slots": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed" } ]
+    }
+  ]
+}
+```
+
+## GET /studyroom/api/readingrooms/{code}/history/monthly
+
+기준 날짜가 속한 달을 두 축으로 반환한다. `days`는 그달 날짜별 일평균(길이 28부터 31), `hours`는 시간대별 월평균(24개, 0시부터 23시)이다.
+
+```json
+{
+  "room": "A1", "date": "2026-10-27",
+  "monthStart": "2026-10-01", "monthEnd": "2026-10-31",
+  "summary": { "percent": 63, "samples": 4000, "reason": null },
+  "days": [ { "date": "2026-10-01", "percent": null, "samples": 0, "reason": "outside_retention" } ],
+  "hours": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed" } ]
 }
 ```
 

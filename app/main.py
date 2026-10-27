@@ -1,8 +1,9 @@
 """FastAPI 프로세스의 기초 진입점이다."""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -13,9 +14,13 @@ from redis.asyncio import Redis
 
 from app.clients.school import SchoolClient, create_school_http
 from app.config.settings import Settings
+from app.database import create_db_engine, create_session_factory, init_database
 from app.errors import ServiceError
+from app.routers.history import router as history_router
 from app.routers.readingroom import router as readingroom_router
 from app.routers.web import router as web_router
+from app.services.collector import run_collector
+from app.services.history import HistoryService
 from app.services.live_cache import LiveCache
 from app.services.readingroom import ReadingroomService
 
@@ -41,13 +46,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     school_http = create_school_http(
         str(config.school_base_url), config.school_request_timeout_seconds
     )
+    school_client = SchoolClient(school_http)
     redis = Redis.from_url(config.redis_url.get_secret_value())
+    # DB 연결은 수집을 켠 경우에만 만든다. 통계 API 도 이 연결에 의존한다.
+    engine = (
+        create_db_engine(config.sqlalchemy_url) if config.collection_enabled else None
+    )
+    session_factory = create_session_factory(engine) if engine is not None else None
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        yield
-        await school_http.aclose()
-        await redis.aclose()
+        task: asyncio.Task[None] | None = None
+        if engine is not None:
+            await init_database(engine)
+        if session_factory is not None:
+            task = asyncio.create_task(
+                run_collector(
+                    session_factory,
+                    school_client,
+                    config.collection_interval_minutes,
+                    config.history_retention_days,
+                )
+            )
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            await school_http.aclose()
+            await redis.aclose()
+            if engine is not None:
+                await engine.dispose()
 
     app = FastAPI(
         title="Sandol Studyroom Service",
@@ -60,8 +91,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = config
     app.state.readingrooms = ReadingroomService(
-        SchoolClient(school_http),
+        school_client,
         LiveCache(redis, config.redis_key_prefix, config.live_cache_ttl_seconds),
+    )
+    app.state.history = (
+        HistoryService(session_factory, config) if session_factory is not None else None
     )
     app.add_exception_handler(ServiceError, handle_service_error)
     # 개발용 프론트엔드는 모드가 켜진 경우에만 등록한다. 꺼지면 경로가 없어 404다.
@@ -73,6 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.include_router(web_router, prefix=PATH_PREFIX)
     app.include_router(readingroom_router, prefix=PATH_PREFIX)
+    app.include_router(history_router, prefix=PATH_PREFIX)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_allowed_origins,

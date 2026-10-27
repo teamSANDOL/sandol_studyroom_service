@@ -25,6 +25,34 @@
         <div id="rooms" class="room-grid"></div>
       </section>
 
+      <section aria-labelledby="stats-title">
+        <div class="section-head">
+          <h2 id="stats-title">혼잡도 통계</h2>
+          <span id="stats-status" class="status" role="status"></span>
+        </div>
+        <div class="card stats-card">
+          <form id="stats-form" class="stats-form">
+            <select id="stats-room" aria-label="열람실">
+              <option>A1</option><option>A2</option><option>E1</option>
+            </select>
+            <div id="stats-view" class="tabs" role="tablist" aria-label="통계 기간">
+              <button type="button" class="tab" data-view="daily" aria-pressed="true">일간</button>
+              <button type="button" class="tab" data-view="weekly" aria-pressed="false">주간</button>
+              <button type="button" class="tab" data-view="monthly" aria-pressed="false">월간</button>
+            </div>
+            <input id="stats-date" type="date" aria-label="기준 날짜">
+            <button type="submit">조회</button>
+          </form>
+          <p id="stats-meta" class="stats-meta"></p>
+          <div id="stats-chart" class="stats-chart" aria-live="polite"></div>
+          <div id="stats-legend" class="legend stats-legend"></div>
+          <div class="raw">
+            <button id="stats-raw-toggle" type="button" class="ghost">raw 응답 보기</button>
+            <pre id="stats-raw-json" class="result" aria-live="polite" hidden></pre>
+          </div>
+        </div>
+      </section>
+
       <section id="detail-section" aria-labelledby="detail-title" hidden>
         <div class="section-head">
           <h2 id="detail-title">상세</h2>

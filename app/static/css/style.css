@@ -196,7 +196,63 @@ select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .result:empty { display: none; }
 
+/* 통계 */
+.stats-card { display: grid; gap: 14px; }
+.stats-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tabs { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tab {
+  border: none;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 8px 14px;
+}
+.tab + .tab { border-left: 1px solid var(--border); }
+.tab[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.tab:hover { filter: none; background: var(--bg); }
+.tab[aria-pressed="true"]:hover { background: var(--accent); }
+.stats-meta { margin: 0; font-size: 12px; color: var(--muted); }
+.stats-chart { display: grid; gap: 6px; }
+.chart-title { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.chart { width: 100%; height: auto; overflow: visible; }
+.chart .axis { stroke: var(--border); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; }
+.chart .tick.mid { text-anchor: middle; }
+.chart .bar-empty { fill: var(--unknown); opacity: 0.35; }
+.chart .bar-empty.future { opacity: 0.15; }
+.chart .cell { stroke: var(--surface); stroke-width: 1; }
+.chart .cell-empty.missing { stroke: var(--unknown-bg); }
+.chart .cell-empty.future { fill: var(--bg); }
+.chart rect { transition: opacity 120ms ease; }
+.chart rect:hover { opacity: 0.8; }
+
+.empty-note {
+  margin: 0;
+  padding: 22px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.stats-legend { margin: 0; align-items: center; }
+.heat-scale { display: inline-flex; align-items: center; gap: 6px; }
+.heat-gradient {
+  width: 72px;
+  height: 10px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #1f9d57, #c77700, #d2443b);
+}
+.dot.empty { opacity: 0.5; }
+.dot.empty.missing { background: var(--unknown); }
+.dot.empty.closed { background: var(--unknown); opacity: 0.8; }
+.dot.empty.future { background: var(--border); }
+.dot.empty.outside_retention { background: var(--unknown); opacity: 0.3; }
+
 @media (max-width: 520px) {
   .topbar { flex-direction: column; }
   .room-grid { grid-template-columns: 1fr 1fr; }
+  .stats-form { gap: 6px; }
 }

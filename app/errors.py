@@ -21,6 +21,12 @@ class SchoolResponseError(ServiceError):
     message = "학교 좌석 시스템의 응답 형식이 예상과 다르다."
 
 
+class HistoryUnavailableError(ServiceError):
+    status_code = 503
+    code = "history_unavailable"
+    message = "혼잡도 이력을 제공할 수 없다. 수집 또는 DB 연결이 꺼져 있다."
+
+
 class ReadingroomNotFoundError(ServiceError):
     status_code = 404
     code = "readingroom_not_found"

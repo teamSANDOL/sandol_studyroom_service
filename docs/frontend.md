@@ -1,16 +1,36 @@
 # 테스트용 페이지
 
-FastAPI는 `/studyroom/`에서 API 동작을 확인하는 개발용 페이지를 제공한다. 사용자에게 보여 줄 화면이 아니므로 디자인 없이 API 응답만 표시한다. 모든 값은 서비스 API를 거쳐 학교 좌석 시스템에서 가져온다.
+FastAPI는 `/studyroom/`에서 API 동작을 확인하는 개발용 페이지를 제공한다. 사용자에게 보여 줄 최종 화면이 아니라 응답을 눈으로 확인하는 용도다. 모든 값은 서비스 API를 거쳐 학교 좌석 시스템과 수집 DB에서 가져온다.
+
+이 페이지는 `DEVELOPMENT_FRONTEND_MODE`가 켜진 경우에만 뜬다. 꺼져 있으면 `/studyroom/`과 static은 404다. API와 health는 모드와 무관하게 열려 있다.
 
 ## 파일 역할
 
 - `app/routers/web.py`는 HTML 파일을 응답한다.
-- `app/template/index.html`은 API별 확인 영역을 정의한다.
-- `app/static/js/app.js`는 API를 요청하고 결과를 표와 문장으로 표시한다.
-- `app/static/css/style.css`는 표와 좌석 칸의 최소 스타일이다.
+- `app/template/index.html`은 확인 영역을 정의한다.
+- `app/static/js/app.js`는 API를 요청하고 카드, 좌석 칸, 통계 그래프를 그린다.
+- `app/static/css/style.css`는 카드와 좌석 칸, 통계 그래프의 스타일이다.
 
 ## 기능
 
-열람실 현황 표는 `GET api/readingrooms`를 페이지 진입 시와 새로고침 버튼으로 요청한다. 행을 누르면 `GET api/readingrooms/{code}`와 `GET api/readingrooms/{code}/seats`를 함께 요청해 운영 정책, 30분 안에 반납 예정인 좌석, 좌석 칸을 표시한다. 좌석 칸은 상태별 색으로 구분하고 마우스를 올리면 남은 시간을 보여 준다.
+열람실 카드는 `GET api/readingrooms`를 페이지 진입 시와 새로고침 버튼으로 요청한다. 카드마다 사용 좌석과 여유, 사용률 막대, 운영 상태 배지를 보여 준다. 카드를 누르면 `GET api/readingrooms/{code}`와 `GET api/readingrooms/{code}/seats`를 함께 요청해 운영 정책, 30분 안에 반납 예정인 좌석, 좌석 칸을 표시한다. 좌석 칸은 상태별 색으로 구분하고 마우스를 올리면 남은 시간을 보여 준다. 상세에는 raw 응답 보기 버튼이 있다.
 
-좌석 조회 form은 `GET api/readingrooms/{code}/seats/{number}` 응답 JSON을 그대로 출력한다. 서버 상태 버튼은 `GET health`를 요청한다. 모든 요청은 5초 timeout을 두고 실패하면 HTTP 상태와 오류 코드를 표시한다.
+혼잡도 통계는 열람실, 기간(일간, 주간, 월간), 날짜를 고르면 해당 history API를 요청해 인라인 SVG로 그린다. 외부 라이브러리는 쓰지 않는다.
+
+- 일간은 24시간 막대그래프다.
+- 주간은 요일 x 2시간 구간 heatmap이다.
+- 월간은 날짜별 일평균 막대와 시간대별 월평균 막대 두 개를 쌓아 그린다.
+
+막대와 칸 색은 사용률을 초록에서 빨강으로 잇는다. 값을 못 구한 구간(휴실, 수집 없음, 아직 아님, 보관 범위 밖)은 흐리게 두고 마우스를 올리면 사유를 보여 준다. 메타 줄에 보관 기간, 수집 시작일, 수집 지연 여부, 마지막 오류를 적는다. 통계에도 raw 응답 보기 버튼이 있다.
+
+좌석 조회 form은 `GET api/readingrooms/{code}/seats/{number}` 응답 JSON을 그대로 출력한다. 서버 상태 버튼은 `GET health`를 요청한다.
+
+## 빈 상태와 실패
+
+데이터가 없거나 불러오지 못해도 빈 화면 대신 그 사실을 보여 준다.
+
+- 열람실을 불러오지 못하면 카드 자리에 실패 문구를 둔다.
+- 통계에 쌓인 표본이 없으면 그래프 위에 데이터 없음 문구를 둔다.
+- 수집이나 DB가 꺼져 통계 API가 503이면 그래프 자리에 제공 불가 문구를 둔다.
+
+모든 요청은 5초 timeout을 두고, 실패하면 각 영역의 상태 표시에 HTTP 상태와 오류 코드를 적는다.
