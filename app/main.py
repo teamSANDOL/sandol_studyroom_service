@@ -64,12 +64,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         LiveCache(redis, config.redis_key_prefix, config.live_cache_ttl_seconds),
     )
     app.add_exception_handler(ServiceError, handle_service_error)
-    app.mount(
-        f"{PATH_PREFIX}/static",
-        StaticFiles(directory=Path(__file__).resolve().parent / "static"),
-        name="static",
-    )
-    app.include_router(web_router, prefix=PATH_PREFIX)
+    # 개발용 프론트엔드는 모드가 켜진 경우에만 등록한다. 꺼지면 경로가 없어 404다.
+    if config.development_frontend_mode:
+        app.mount(
+            f"{PATH_PREFIX}/static",
+            StaticFiles(directory=Path(__file__).resolve().parent / "static"),
+            name="static",
+        )
+        app.include_router(web_router, prefix=PATH_PREFIX)
     app.include_router(readingroom_router, prefix=PATH_PREFIX)
     app.add_middleware(
         CORSMiddleware,

@@ -1,48 +1,79 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>열람실 API 확인</title>
+    <title>열람실 현황 확인</title>
     <link rel="stylesheet" href="static/css/style.css">
     <script type="module" src="static/js/app.js"></script>
   </head>
   <body>
-    <h1>열람실 API 확인</h1>
-    <p class="note">개발용 화면이다. 각 영역은 아래 적힌 API 응답을 그대로 보여 준다.</p>
+    <header class="topbar">
+      <div>
+        <h1>열람실 현황</h1>
+        <p class="sub">개발용 확인 화면이다. 값은 모두 서비스 API를 거쳐 학교 좌석 시스템에서 가져온다.</p>
+      </div>
+      <button id="rooms-refresh" type="button" class="ghost">새로고침</button>
+    </header>
 
-    <section>
-      <h2>열람실 현황 <code>GET api/readingrooms</code></h2>
-      <button id="rooms-refresh" type="button">새로고침</button>
-      <span id="rooms-status" role="status"></span>
-      <table>
-        <thead><tr><th>코드</th><th>이름</th><th>전체</th><th>사용</th><th>여유</th><th>운영</th></tr></thead>
-        <tbody id="rooms"></tbody>
-      </table>
-    </section>
+    <main>
+      <section aria-labelledby="rooms-title">
+        <div class="section-head">
+          <h2 id="rooms-title">열람실</h2>
+          <span id="rooms-status" class="status" role="status"></span>
+        </div>
+        <div id="rooms" class="room-grid"></div>
+      </section>
 
-    <section>
-      <h2>열람실 상세 <code>GET api/readingrooms/{code}</code></h2>
-      <p>위 표에서 행을 누르면 조회한다.</p>
-      <span id="detail-status" role="status"></span>
-      <div id="detail"></div>
-      <div id="seat-grid" class="seat-grid"></div>
-    </section>
+      <section id="detail-section" aria-labelledby="detail-title" hidden>
+        <div class="section-head">
+          <h2 id="detail-title">상세</h2>
+          <span id="detail-status" class="status" role="status"></span>
+        </div>
+        <div class="card detail-card">
+          <div id="detail-head" class="detail-head"></div>
+          <dl id="detail-meta" class="meta"></dl>
+          <div class="ending">
+            <h3>30분 안에 반납 예정</h3>
+            <div id="ending" class="chips"></div>
+          </div>
+          <div class="seat-block">
+            <div class="legend">
+              <span><i class="dot available"></i>빈 좌석</span>
+              <span><i class="dot occupied"></i>사용 중</span>
+              <span><i class="dot ending"></i>30분 이내</span>
+              <span><i class="dot unknown"></i>미확인</span>
+            </div>
+            <div id="seat-grid" class="seat-grid"></div>
+          </div>
+          <div class="raw">
+            <button id="raw-toggle" type="button" class="ghost">raw 응답 보기</button>
+            <pre id="raw-json" class="result" aria-live="polite" hidden></pre>
+          </div>
+        </div>
+      </section>
 
-    <section>
-      <h2>좌석 조회 <code>GET api/readingrooms/{code}/seats/{number}</code></h2>
-      <form id="seat-form">
-        <select id="seat-room"><option>A1</option><option>A2</option><option>E1</option></select>
-        <input id="seat-number" inputmode="numeric" maxlength="4" placeholder="좌석 번호" required>
-        <button type="submit">조회</button>
-      </form>
-      <pre id="seat-result"></pre>
-    </section>
+      <section aria-labelledby="seat-title">
+        <div class="section-head"><h2 id="seat-title">좌석 조회</h2></div>
+        <div class="card">
+          <form id="seat-form" class="seat-form">
+            <select id="seat-room" aria-label="열람실">
+              <option>A1</option><option>A2</option><option>E1</option>
+            </select>
+            <input id="seat-number" inputmode="numeric" maxlength="4" placeholder="좌석 번호" aria-label="좌석 번호" required>
+            <button type="submit">조회</button>
+          </form>
+          <pre id="seat-result" class="result" aria-live="polite"></pre>
+        </div>
+      </section>
 
-    <section>
-      <h2>서버 상태 <code>GET health</code></h2>
-      <button id="health" type="button">확인</button>
-      <span id="health-status" role="status"></span>
-    </section>
+      <section aria-labelledby="health-title">
+        <div class="section-head"><h2 id="health-title">서버 상태</h2></div>
+        <div class="card row">
+          <button id="health" type="button" class="ghost">health 확인</button>
+          <span id="health-status" class="status" role="status"></span>
+        </div>
+      </section>
+    </main>
   </body>
 </html>

@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
     api_docs_enabled: bool = False
+    # 참이면 개발용 프론트엔드(/studyroom/ 과 static)를 제공한다. 운영에서는 끈다.
+    development_frontend_mode: bool = False
     cors_allowed_origins: list[str] = Field(default_factory=list)
 
     postgres_db: str = Field(default="studyroom_service", min_length=1)
