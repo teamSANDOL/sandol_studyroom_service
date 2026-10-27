@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#214ecf">
+    <title>산돌이 | 열람실과 스터디룸</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23214ecf'/%3E%3Cpath d='M8 23V9h4v10h12v4z' fill='white'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="static/css/style.css">
+    <script type="module" src="static/js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 이동</a>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="산돌이 홈">산돌이<span>도서관 공간 안내</span></a>
+      <nav aria-label="페이지 탐색"><a href="#readingrooms">열람실</a><a href="#studyrooms">스터디룸</a></nav>
+    </header>
+    <main id="main">
+      <div class="demo-bar"><span class="sample-tag">예시 데이터</span><p>좌석 상태와 예약은 가상 데이터다. 실제 이용 가능 여부를 나타내지 않는다.</p><span id="demo-clock">가상 현재 14:10</span></div>
+      <p id="page-error" class="error-note" role="alert" hidden></p>
+      <section id="readingrooms" class="room-section" aria-labelledby="reading-title">
+        <div class="section-heading"><div><h1 id="reading-title">열람실 현황</h1><p>열람실을 선택하면 배치도와 만료 예정 좌석을 확인한다.</p></div><span id="reading-summary" class="section-meta"></span></div>
+        <div id="readingroom-list" class="readingroom-grid"></div>
+        <div class="reading-workspace">
+          <section class="map-panel" aria-labelledby="map-title">
+            <div class="panel-heading"><div><h2 id="map-title">좌석 배치도</h2><p id="room-meta"></p></div><span class="sample-tag">가상 현황</span></div>
+            <div class="map-toolbar">
+              <div class="filter-group" aria-label="좌석 표시"><button type="button" data-filter="all" aria-pressed="true">전체 좌석</button><button type="button" data-filter="available" aria-pressed="false">빈 좌석 강조</button></div>
+              <form id="seat-search-form" class="seat-search"><label for="seat-search">좌석 번호</label><input id="seat-search" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="예: 24"><button type="submit">찾기</button></form>
+            </div>
+            <div class="legend" aria-label="좌석 상태 범례"><span><i class="legend-available"></i>빈 좌석</span><span><i class="legend-occupied"></i>사용 중</span><span><i class="legend-unknown"></i>미확인</span><span><i class="legend-ending"></i>30분 이내 만료 예정</span></div>
+            <div id="map-scroll" class="map-scroll" tabindex="0" role="region" aria-label="좌석 배치도, 좌우로 스크롤 가능"><div id="seat-map" class="seat-map"></div></div>
+            <div id="unmapped-seats" class="unmapped-seats" hidden></div>
+          </section>
+          <aside class="seat-sidebar">
+            <section class="detail-panel" aria-labelledby="seat-detail-title"><h2 id="seat-detail-title">선택한 좌석</h2><div id="seat-detail" role="status" aria-live="polite" aria-atomic="true"><p class="empty-note">배치도에서 좌석을 선택하라.</p></div></section>
+            <section class="ending-panel" aria-labelledby="ending-title"><div class="ending-heading"><h2 id="ending-title">곧 만료되는 좌석</h2><span>30분 이내</span></div><ul id="ending-seats"></ul><p class="panel-note">예시 기준 시각의 잔여 시간이다. 연장과 조기 반납으로 달라질 수 있으며 빈자리 발생을 보장하지 않는다.</p></section>
+          </aside>
+        </div>
+      </section>
+      <section id="history" class="room-section history-section" aria-labelledby="history-title">
+        <div class="section-heading"><div><h2 id="history-title">열람실 혼잡도 추이</h2><p id="history-room">선택한 열람실의 가상 추이를 표시한다.</p></div><div class="history-date-control"><button id="history-previous" type="button" aria-label="이전 날짜">이전</button><label for="history-date">기준 날짜</label><input id="history-date" type="date"><button id="history-next" type="button" aria-label="다음 날짜">다음</button></div></div>
+        <p id="history-date-message" class="error-note" role="status" hidden></p>
+        <div class="history-panels">
+          <section class="trend-panel" aria-labelledby="daily-title">
+            <div class="panel-heading"><div><h3 id="daily-title">일간 추이</h3><p id="daily-date"></p></div><span class="sample-tag">가상 기록</span></div>
+            <div id="daily-stats" class="trend-stats"></div>
+            <p id="daily-empty" class="empty-note history-empty" hidden></p>
+            <div id="daily-chart-wrap" class="trend-chart-scroll" tabindex="0" role="region" aria-label="시간별 혼잡도 그래프, 좌우로 스크롤 가능"><div id="daily-chart" class="trend-chart"></div></div>
+            <p id="daily-readout" class="history-readout" role="status" aria-live="polite" aria-atomic="true">그래프의 점을 선택하면 시간별 사용률을 확인한다.</p>
+            <p class="history-note">시간별 평균 사용률이다. 오늘은 가상 현재 14:10까지의 예시만 표시하며, 미수집과 휴실은 0%로 계산하지 않는다.</p>
+          </section>
+          <section class="weekly-panel" aria-labelledby="weekly-title">
+            <div class="panel-heading"><div><h3 id="weekly-title">주간 추이</h3><p id="weekly-range"></p></div><div class="week-buttons"><button id="week-previous" type="button" aria-label="이전 주">이전 주</button><button id="week-next" type="button" aria-label="다음 주">다음 주</button></div></div>
+            <div id="weekly-stats" class="trend-stats"></div>
+            <p id="weekly-empty" class="empty-note history-empty" hidden></p>
+            <div id="weekly-grid-wrap" class="heatmap-scroll" tabindex="0" role="region" aria-label="주간 혼잡도 표, 좌우로 스크롤 가능"><table class="heatmap-table"><caption id="heatmap-caption"></caption><thead id="heatmap-head"></thead><tbody id="heatmap-body"></tbody></table></div>
+            <div class="heatmap-legend"><span>사용률</span><span class="heat-key" data-level="0">0 - 19%</span><span class="heat-key" data-level="1">20 - 39%</span><span class="heat-key" data-level="2">40 - 59%</span><span class="heat-key" data-level="3">60 - 79%</span><span class="heat-key" data-level="4">80 - 100%</span><span>휴실, 미수집, 미래는 별도 표시</span></div>
+            <p id="weekly-readout" class="history-readout" role="status" aria-live="polite" aria-atomic="true">요일별 날짜를 누르면 일간 추이가 바뀐다. 칸을 선택하면 2시간 구간의 사용률을 확인한다.</p>
+          </section>
+        </div>
+      </section>
+      <section id="studyrooms" class="room-section" aria-labelledby="study-title">
+        <div class="section-heading"><div><h2 id="study-title">스터디룸 시간표</h2><p>상단은 가상 현재 상태, 아래는 선택한 날짜의 예약 기록이다.</p></div><div class="date-control"><label for="study-date">예약 날짜</label><select id="study-date"></select></div></div>
+        <div class="schedule-panel">
+          <div id="studyroom-list" class="studyroom-grid" aria-label="가상 현재 스터디룸 상태"></div>
+          <div class="schedule-heading"><p id="schedule-date"></p><span class="schedule-legend"><i></i>예약 기록<span>기록 없음은 예약 가능 확정이 아니다.</span></span></div>
+          <div class="schedule-scroll" tabindex="0" role="region" aria-label="스터디룸 시간표, 좌우로 스크롤 가능"><table id="schedule"><caption id="schedule-caption"></caption><thead><tr><th scope="col">시간 구간</th><th scope="col">1번방</th><th scope="col">2번방</th><th scope="col">3번방</th><th scope="col">4번방</th><th scope="col">5번방</th><th scope="col">6번방</th></tr></thead><tbody id="schedule-body"></tbody></table></div>
+          <div id="study-detail" class="study-detail" role="status" aria-live="polite" aria-atomic="true">시간표의 칸을 선택하면 예약 범위를 확인한다.</div>
+        </div>
+        <p class="section-footnote">시간은 학교 화면의 slot 표기 방식(시작 :30, 종료 :20)을 따른다. 예약과 좌석 배정은 공식 사이트에서 진행한다.</p>
+      </section>
+      <section class="server-panel" aria-labelledby="server-title"><div><h2 id="server-title">서버 연결 확인</h2><p>실제 서버의 프로세스 생존만 확인한다.</p><p id="health-message" class="health-message" role="status" aria-live="polite" aria-atomic="true">아직 서버 상태를 확인하지 않았다.</p></div><button id="health-button" class="health-button" type="button">서버 상태 확인</button></section>
+      <noscript><p class="error-note">좌석 배치도와 시간표에는 JavaScript가 필요하다.</p></noscript>
+    </main>
+    <footer class="site-footer"><span>테스트 페이지</span></footer>
+  </body>
+</html>

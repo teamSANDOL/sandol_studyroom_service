@@ -1,0 +1,17 @@
+docs-to-build/
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# 로컬 AI 도구 상태와 브라우저 검증 산출물
+.omc/
+.playwright-mcp/
+guide-enriched-mobile.png
