@@ -40,7 +40,7 @@ async def test_page_serves_linked_assets_without_external_connections() -> None:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
         assert response.headers["cache-control"] == "no-store"
-        assert "예시 데이터" in response.text
+        assert "열람실 API 확인" in response.text
         parser = AssetParser()
         parser.feed(response.text)
         assert len(parser.assets) == 2

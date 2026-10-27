@@ -1,76 +1,97 @@
-import { makeRooms } from "./mock-data.mjs";
-import { mountReadingrooms } from "./readingroom.mjs";
-import { mountStudyrooms } from "./studyroom.mjs";
-import { mountHistory } from "./history.mjs";
+const TIMEOUT_MS = 5000;
+const $ = (id) => document.getElementById(id);
 
-mountStudyrooms();
+async function getJson(path) {
+  const response = await fetch(new URL(path, document.baseURI), {
+    cache: "no-store",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${body?.code ?? ""}`.trim());
+  return body;
+}
 
-async function loadReadingrooms() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+function time(iso) {
+  return iso ? new Date(iso).toLocaleTimeString("ko-KR") : "-";
+}
+
+function cell(row, text) {
+  row.insertCell().textContent = text;
+}
+
+async function run(statusId, task) {
+  const status = $(statusId);
+  status.textContent = "조회 중";
   try {
-    const response = await fetch(new URL("../data/readingroom-layouts.json", import.meta.url), {
-      cache: "no-store", signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Layout HTTP ${response.status}`);
-    const layouts = await response.json();
-    const history = mountHistory();
-    mountReadingrooms(makeRooms(layouts), layouts, history.chooseRoom);
-  } catch {
-    const message = document.getElementById("page-error");
-    message.hidden = false;
-    message.textContent = "좌석 배치도를 불러오지 못했다. 페이지를 새로고침해 다시 시도하라.";
-  } finally {
-    clearTimeout(timeout);
+    status.textContent = (await task()) ?? "";
+  } catch (error) {
+    status.textContent = `실패: ${error.message}`;
   }
 }
 
-void loadReadingrooms();
+function loadRooms() {
+  return run("rooms-status", async () => {
+    const data = await getJson("api/readingrooms");
+    const body = $("rooms");
+    body.replaceChildren();
+    for (const room of data.rooms) {
+      const row = body.insertRow();
+      for (const value of [room.code, room.name, room.total, room.used, room.available, room.operation]) {
+        cell(row, value);
+      }
+      row.addEventListener("click", () => loadDetail(room.code));
+    }
+    return `기준 ${time(data.updatedAt)}`;
+  });
+}
 
-const healthButton = document.getElementById("health-button");
-const healthMessage = document.getElementById("health-message");
+function loadDetail(code) {
+  return run("detail-status", async () => {
+    const [detail, seats] = await Promise.all([
+      getJson(`api/readingrooms/${code}`),
+      getJson(`api/readingrooms/${code}/seats`),
+    ]);
+    const { room, endingSoon } = detail;
+    const policy = room.policy;
+    const ending = endingSoon.seats.map((seat) => `${seat.number}번 ${seat.remainingMinutes}분`).join(", ") || "없음";
+    const lines = [
+      `${room.code} ${room.name}: ${room.used}/${room.total} 사용, ${room.operation}`,
+      `오늘 운영 ${policy.start} - ${policy.end} (${policy.kind}), 노트북 ${policy.notebook ? "허용" : "불가"}, 배정 ${policy.hours}시간`,
+      `${endingSoon.withinMinutes}분 안에 반납 예정: ${ending}`,
+      `집계 기준 ${time(detail.updatedAt)}, 좌석 기준 ${time(seats.updatedAt)}`,
+    ];
+    $("detail").replaceChildren(...lines.map((line) => {
+      const p = document.createElement("p");
+      p.textContent = line;
+      return p;
+    }));
+    $("seat-grid").replaceChildren(...seats.seats.map((seat) => {
+      const box = document.createElement("span");
+      box.className = `seat ${seat.status}`;
+      box.textContent = seat.number;
+      box.title = seat.remainingMinutes === null ? seat.name : `${seat.name} 남은 ${seat.remainingMinutes}분`;
+      return box;
+    }));
+  });
+}
 
-healthButton.addEventListener("click", async () => {
-  healthButton.disabled = true;
-  healthButton.textContent = "확인 중";
-  healthMessage.dataset.state = "loading";
-  healthMessage.textContent = "서버 응답을 기다리는 중이다.";
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+$("rooms-refresh").addEventListener("click", loadRooms);
+
+$("seat-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const result = $("seat-result");
   try {
-    const response = await fetch(new URL("health", document.baseURI), {
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      healthMessage.dataset.state = "error";
-      healthMessage.textContent = `서버가 HTTP ${response.status}로 응답했다. 잠시 후 다시 확인하라.`;
-      return;
-    }
-    let data;
-    try {
-      data = await response.json();
-    } catch (error) {
-      if (controller.signal.aborted) throw error;
-      healthMessage.dataset.state = "error";
-      healthMessage.textContent = "서버 응답을 해석하지 못했다. 응답 형식을 확인하라.";
-      return;
-    }
-    if (data?.status !== "ok") {
-      healthMessage.dataset.state = "error";
-      healthMessage.textContent = "서버 응답이 예상한 형식과 다르다. /health 응답을 확인하라.";
-      return;
-    }
-    healthMessage.dataset.state = "success";
-    healthMessage.textContent = "서버가 정상 응답했다. 프로세스 생존을 확인했다.";
-  } catch {
-    healthMessage.dataset.state = "error";
-    healthMessage.textContent = controller.signal.aborted
-      ? "서버가 5초 안에 응답하지 않았다. 잠시 후 다시 확인하라."
-      : "서버에 연결하지 못했다. 서버 실행 상태를 확인하고 다시 시도하라.";
-  } finally {
-    clearTimeout(timeout);
-    healthButton.disabled = false;
-    healthButton.textContent = "서버 상태 확인";
+    const data = await getJson(`api/readingrooms/${$("seat-room").value}/seats/${encodeURIComponent($("seat-number").value.trim())}`);
+    result.textContent = JSON.stringify(data, null, 2);
+  } catch (error) {
+    result.textContent = `실패: ${error.message}`;
   }
 });
+
+$("health").addEventListener("click", () => run("health-status", async () => {
+  const data = await getJson("health");
+  if (data?.status !== "ok") throw new Error("응답 형식이 다르다");
+  return "정상";
+}));
+
+void loadRooms();

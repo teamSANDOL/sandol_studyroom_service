@@ -62,7 +62,7 @@ def test_missing_database_password_is_rejected() -> None:
     ("field", "value"),
     [
         ("live_cache_ttl_seconds", 0),
-        ("collection_interval_seconds", 0),
+        ("collection_interval_minutes", 0),
         ("school_request_timeout_seconds", -1),
         ("postgres_port", 65536),
     ],
@@ -77,12 +77,12 @@ def test_invalid_runtime_limits_are_rejected(field: str, value: int) -> None:
 def test_collection_delay_must_exceed_interval() -> None:
     from app.config.settings import Settings
 
-    with pytest.raises(ValidationError, match="COLLECTION_STALE_AFTER_SECONDS"):
+    with pytest.raises(ValidationError, match="COLLECTION_STALE_AFTER_MINUTES"):
         Settings(
             _env_file=None,
             postgres_password="test-password",
-            collection_interval_seconds=60,
-            collection_stale_after_seconds=60,
+            collection_interval_minutes=3,
+            collection_stale_after_minutes=3,
         )
 
 

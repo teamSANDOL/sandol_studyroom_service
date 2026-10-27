@@ -41,9 +41,10 @@ class Settings(BaseSettings):
     library_base_url: AnyHttpUrl = AnyHttpUrl("https://library.tukorea.ac.kr")
     school_request_timeout_seconds: float = Field(default=10, gt=0)
     guide_request_timeout_seconds: float = Field(default=12, gt=0)
-    collection_interval_seconds: int = Field(default=60, gt=0)
+    # 학교 좌석 시스템을 수집해 DB에 적재하는 주기다.
+    collection_interval_minutes: int = Field(default=3, gt=0)
     history_retention_days: int = Field(default=90, gt=0)
-    collection_stale_after_seconds: int = Field(default=180, gt=0)
+    collection_stale_after_minutes: int = Field(default=7, gt=0)
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -60,9 +61,9 @@ class Settings(BaseSettings):
         redis = urlsplit(self.redis_url.get_secret_value())
         if redis.scheme not in {"redis", "rediss"} or not redis.hostname:
             raise ValueError("REDIS_URL must use redis:// or rediss:// with a host")
-        if self.collection_stale_after_seconds <= self.collection_interval_seconds:
+        if self.collection_stale_after_minutes <= self.collection_interval_minutes:
             raise ValueError(
-                "COLLECTION_STALE_AFTER_SECONDS must exceed COLLECTION_INTERVAL_SECONDS"
+                "COLLECTION_STALE_AFTER_MINUTES must exceed COLLECTION_INTERVAL_MINUTES"
             )
         return self
 

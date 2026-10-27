@@ -2,11 +2,11 @@
 
 ## 현재 구성
 
-Docker Compose는 FastAPI, PostgreSQL 15, Redis 7.4를 실행한다. FastAPI는 환경 변수를 검증하고 `/studyroom/health`를 제공한다. 열람실 및 스터디룸 조회, collector와 DB migration은 후속 구현 대상이다.
+Docker Compose는 FastAPI, PostgreSQL 15, Redis 7.4를 실행한다. FastAPI는 환경 변수를 검증하고 `/studyroom/health`와 열람실 현재 현황 API를 제공한다. 열람실 현황은 요청 시 학교 좌석 시스템을 조회하고 Redis에 짧게 cache한다. 스터디룸 조회, collector와 DB migration은 후속 구현 대상이다. API 형식은 [API 문서](docs/api.md), 학교 응답 해석은 [수집 정보](docs/studyroom-info.md)에 기록한다.
 
 API는 localhost의 8000 포트를 사용하고 모든 경로를 `/studyroom` 아래에 둔다. 통합 gateway 가 경로를 그대로 넘기기 때문이다. DB와 Redis는 Compose 내부 네트워크에서 연결하며 DB 기록은 named volume에 보관한다. Redis는 재시작하면 cache를 비운다.
 
-FastAPI는 `/studyroom/`에서 테스트용 페이지를 제공한다. 페이지는 예시 현황을 표시하고 서버 상태 확인 버튼으로 실제 `/studyroom/health`를 요청한다. 파일별 역할과 동작은 [frontend 설명](docs/frontend.md)에 기록한다.
+FastAPI는 `/studyroom/`에서 API 동작을 확인하는 개발용 페이지를 제공한다. 파일별 역할과 동작은 [frontend 설명](docs/frontend.md)에 기록한다.
 
 ## 실행
 
