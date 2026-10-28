@@ -141,14 +141,17 @@
 | `collectionDelayed` | 마지막 적재가 지연 기준보다 오래됐으면 `true` |
 | `updatedAt` | 응답 생성 시각(UTC) |
 
-각 구간은 `{ "percent": 0~100 또는 null, "samples": 표본 수, "reason": 사유 또는 null }`이다. `percent`가 있으면 `reason`은 `null`이고 `samples`는 1 이상이다. 사유가 있으면 `percent`는 `null`, `samples`는 0이다.
+각 구간은 `{ "percent": 0~100 또는 null, "samples": 표본 수, "reason": 사유 또는 null, "isCollected": true 또는 false }`이다. `percent`가 있으면 `reason`은 `null`이고 `samples`는 1 이상이다. 사유가 있으면 `percent`는 `null`, `samples`는 0이다.
 
-| `reason` | 상황 |
-|---|---|
-| `closed` | 관측은 있으나 모두 휴실 상태다 |
-| `missing` | 보관 범위 안인데 관측이 없다 |
-| `future` | 아직 오지 않은 구간이다 |
-| `outside_retention` | 보관 기간 밖이거나 수집 시작 이전이다(주간, 월간만) |
+`isCollected`는 그 구간에 관측이 있었는지다. 휴실이라 사용률을 못 구한 경우도 관측 자체는 있었으므로 `true`다. 그래서 `percent`가 `0`인 진짜 빈 열람실과, 관측이 아예 없는 구간을 이 값으로 가른다.
+
+| `reason` | `isCollected` | 상황 |
+|---|---|---|
+| `null` | `true` | 개실 상태 관측이 있어 사용률을 구했다(0% 포함) |
+| `closed` | `true` | 관측은 있으나 모두 휴실 상태다 |
+| `missing` | `false` | 보관 범위 안인데 관측이 없다 |
+| `future` | `false` | 아직 오지 않은 구간이다 |
+| `outside_retention` | `false` | 보관 기간 밖이거나 수집 시작 이전이다(주간, 월간만) |
 
 `percent`는 개실 상태 관측의 사용률(`used / total`) 평균을 반올림한 값이다.
 
@@ -162,8 +165,8 @@
   "lastStoredAt": "2026-10-27T12:50:00Z", "collectionError": null,
   "collectionDelayed": false, "updatedAt": "2026-10-27T13:00:00Z",
   "room": "A1", "date": "2026-10-27", "lastAt": "2026-10-27T12:50:00Z",
-  "summary": { "percent": 65, "samples": 84, "reason": null },
-  "hours": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed" } ]
+  "summary": { "percent": 65, "samples": 84, "reason": null, "isCollected": true },
+  "hours": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed", "isCollected": true } ]
 }
 ```
 
@@ -175,13 +178,13 @@
 {
   "room": "A1", "date": "2026-10-27",
   "weekStart": "2026-10-26", "weekEnd": "2026-11-01",
-  "summary": { "percent": 61, "samples": 900, "reason": null },
+  "summary": { "percent": 61, "samples": 900, "reason": null, "isCollected": true },
   "days": [
     {
       "date": "2026-10-26",
-      "summary": { "percent": 58, "samples": 120, "reason": null },
+      "summary": { "percent": 58, "samples": 120, "reason": null, "isCollected": true },
       "lastAt": "2026-10-26T12:50:00Z",
-      "slots": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed" } ]
+      "slots": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed", "isCollected": true } ]
     }
   ]
 }
@@ -195,9 +198,9 @@
 {
   "room": "A1", "date": "2026-10-27",
   "monthStart": "2026-10-01", "monthEnd": "2026-10-31",
-  "summary": { "percent": 63, "samples": 4000, "reason": null },
-  "days": [ { "date": "2026-10-01", "percent": null, "samples": 0, "reason": "outside_retention" } ],
-  "hours": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed" } ]
+  "summary": { "percent": 63, "samples": 4000, "reason": null, "isCollected": true },
+  "days": [ { "date": "2026-10-01", "percent": null, "samples": 0, "reason": "outside_retention", "isCollected": false } ],
+  "hours": [ { "hour": 0, "percent": null, "samples": 0, "reason": "closed", "isCollected": true } ]
 }
 ```
 

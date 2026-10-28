@@ -69,9 +69,13 @@ def test_daily_averages_open_and_marks_closed_future_missing() -> None:
 
     nine = result.hours[9]
     assert (nine.percent, nine.samples, nine.reason) == (50, 2, None)
+    assert nine.is_collected is True
     assert result.hours[10].reason == DailyHistoryReason.CLOSED
+    assert result.hours[10].is_collected is True  # 휴실도 관측은 있었다
     assert result.hours[11].reason == DailyHistoryReason.MISSING
+    assert result.hours[11].is_collected is False
     assert result.hours[13].reason == DailyHistoryReason.FUTURE
+    assert result.hours[13].is_collected is False
     assert (result.summary.percent, result.summary.samples) == (50, 2)
     # last_at 은 열림, 닫힘을 가리지 않고 그날 마지막 관측 시각이다.
     assert result.last_at == datetime(2026, 10, 13, 10, 10, tzinfo=KST).astimezone(UTC)
@@ -86,6 +90,8 @@ def test_daily_percent_rounds_to_zero_still_counts_samples() -> None:
 
     eight = result.hours[8]
     assert (eight.percent, eight.samples, eight.reason) == (0, 1, None)
+    # 진짜 빈 열람실(0%)도 관측이 있었으므로 is_collected 는 참이다.
+    assert eight.is_collected is True
 
 
 def test_weekly_covers_monday_to_sunday_with_two_hour_slots() -> None:

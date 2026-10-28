@@ -44,20 +44,25 @@ class MonthlyHistoryReason(str, Enum):
 
 
 class OccupancySummary(APISchema):
-    """사용률과 집계 표본 수, 계산 불가 사유다."""
+    """사용률과 집계 표본 수, 계산 불가 사유, 관측 존재 여부다."""
 
     percent: int | None = Field(ge=0, le=100)
     samples: int = Field(ge=0)
     reason: DailyHistoryReason | None
+    # 그 구간에 관측이 있었는지다. 휴실도 관측은 있었으므로 참이다. 0% 와 무관하다.
+    is_collected: bool = Field(alias="isCollected")
 
     @model_validator(mode="after")
     def require_consistent_summary(self) -> "OccupancySummary":
-        """사용률 유무에 따라 표본 수와 사유를 맞춘다."""
+        """사용률 유무에 따라 표본 수와 사유, 관측 존재를 맞춘다."""
         if self.reason is None:
             if self.percent is None or self.samples == 0:
                 raise ValueError("a calculated percent requires at least one sample")
         elif self.percent is not None or self.samples != 0:
             raise ValueError("an unavailable percent requires zero samples")
+        collected = self.reason is None or self.reason.value == "closed"
+        if self.is_collected != collected:
+            raise ValueError("isCollected must reflect whether observations existed")
         return self
 
 

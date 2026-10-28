@@ -84,9 +84,9 @@ def _metadata(ctx: HistoryContext) -> dict[str, Any]:
 def _summary(
     points: list[ObservationPoint], *, future: bool, empty: str
 ) -> dict[str, Any]:
-    """구간의 관측을 사용률, 표본 수, 불가 사유로 요약한다."""
+    """구간의 관측을 사용률, 표본 수, 불가 사유, 관측 존재로 요약한다."""
     if future:
-        return {"percent": None, "samples": 0, "reason": _FUTURE}
+        return {"percent": None, "samples": 0, "reason": _FUTURE, "is_collected": False}
     open_points = [p for p in points if p.is_open and p.total > 0]
     if open_points:
         ratio = sum(p.used / p.total for p in open_points) / len(open_points)
@@ -94,10 +94,12 @@ def _summary(
             "percent": round(ratio * 100),
             "samples": len(open_points),
             "reason": None,
+            "is_collected": True,
         }
     if points:
-        return {"percent": None, "samples": 0, "reason": _CLOSED}
-    return {"percent": None, "samples": 0, "reason": empty}
+        # 관측은 있으나 모두 휴실이다. 관측 자체는 존재한다.
+        return {"percent": None, "samples": 0, "reason": _CLOSED, "is_collected": True}
+    return {"percent": None, "samples": 0, "reason": empty, "is_collected": False}
 
 
 def _at(day: date, hour: int = 0) -> datetime:
