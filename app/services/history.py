@@ -4,12 +4,15 @@
 HistoryService 는 구간에 맞는 관측을 읽어 그 함수에 넘긴다.
 """
 
+import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from functools import cached_property
 from typing import Any, TypeVar
 
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -24,11 +27,13 @@ from app.schemas.history import (
     WeeklyHistoryResponse,
 )
 from app.schemas.readingroom import ReadingroomCode
+from app.services.live_cache import LiveCache
 from app.services.readingroom_parser import KST
 
 logger = logging.getLogger(__name__)
 
 _Response = TypeVar("_Response")
+_Model = TypeVar("_Model", bound=BaseModel)
 
 # 사유가 있으면 사용률은 없다. 네 enum 이 같은 문자열을 공유한다.
 _FUTURE = "future"
@@ -46,7 +51,8 @@ class ObservationPoint:
     used: int
     is_open: bool
 
-    @property
+    # 집계가 같은 관측의 local 을 수만 번 다시 읽으므로 한 번만 계산한다.
+    @cached_property
     def local(self) -> datetime:
         return self.observed_minute.astimezone(KST)
 
@@ -291,18 +297,31 @@ class HistoryService:
         session_factory: async_sessionmaker[AsyncSession],
         settings: Settings,
         clock: Callable[[], datetime] = _utc_now,
+        cache: LiveCache | None = None,
     ) -> None:
         self._factory = session_factory
         self._settings = settings
         self._clock = clock
+        self._cache = cache
 
     async def daily(
         self, room: ReadingroomCode, target: date | None
     ) -> DailyHistoryResponse:
         now = self._clock()
         day = target or now.astimezone(KST).date()
-        return await self._run(
-            room, now, _window(day, day), build_daily, HistoryRoomCode(room.value), day
+        return await self._cached(
+            f"daily:{room.value}:{day}",
+            DailyHistoryResponse,
+            now,
+            day,
+            lambda: self._run(
+                room,
+                now,
+                _window(day, day),
+                build_daily,
+                HistoryRoomCode(room.value),
+                day,
+            ),
         )
 
     async def weekly(
@@ -311,13 +330,19 @@ class HistoryService:
         now = self._clock()
         day = target or now.astimezone(KST).date()
         start = day - timedelta(days=day.weekday())
-        return await self._run(
-            room,
+        return await self._cached(
+            f"weekly:{room.value}:{start}",
+            WeeklyHistoryResponse,
             now,
-            _window(start, start + timedelta(days=6)),
-            build_weekly,
-            HistoryRoomCode(room.value),
             day,
+            lambda: self._run(
+                room,
+                now,
+                _window(start, start + timedelta(days=6)),
+                build_weekly,
+                HistoryRoomCode(room.value),
+                day,
+            ),
         )
 
     async def monthly(
@@ -326,14 +351,37 @@ class HistoryService:
         now = self._clock()
         day = target or now.astimezone(KST).date()
         start, end = _month_bounds(day)
-        return await self._run(
-            room,
+        return await self._cached(
+            f"monthly:{room.value}:{start:%Y-%m}",
+            MonthlyHistoryResponse,
             now,
-            _window(start, end),
-            build_monthly,
-            HistoryRoomCode(room.value),
             day,
+            lambda: self._run(
+                room,
+                now,
+                _window(start, end),
+                build_monthly,
+                HistoryRoomCode(room.value),
+                day,
+            ),
         )
+
+    async def _cached(
+        self,
+        key: str,
+        model: type[_Model],
+        now: datetime,
+        day: date,
+        load: Callable[[], Awaitable[_Model]],
+    ) -> _Model:
+        # 보관 기간 밖 날짜는 cache 하지 않는다. 요청마다 key 가 늘어 Redis 가 커진다.
+        today = now.astimezone(KST).date()
+        oldest = today - timedelta(days=self._settings.history_retention_days)
+        if self._cache is None or not oldest <= day <= today:
+            return await load()
+        cached = await self._cache.get_or_load(key, model, load)
+        # 주와 달은 key 를 기간 시작으로 묶으므로 응답의 date 를 요청 값으로 되돌린다.
+        return cached.model_copy(update={"date": day})
 
     async def _run(
         self,
@@ -354,7 +402,8 @@ class HistoryService:
         except SQLAlchemyError:
             logger.warning("history query failed for %s", room.value)
             raise HistoryUnavailableError from None
-        return build(points, room_code, target, ctx)
+        # 한 달 집계가 수백 ms 걸리므로 event loop 를 막지 않게 thread 로 보낸다.
+        return await asyncio.to_thread(build, points, room_code, target, ctx)
 
     @staticmethod
     async def _fetch(

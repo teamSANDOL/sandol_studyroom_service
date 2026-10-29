@@ -25,9 +25,19 @@ router = APIRouter(
 )
 
 RoomCode = Annotated[str, Path(description="열람실 코드. A1, A2, E1", examples=["A1"])]
+# 범위 밖 날짜는 UTC 변환에서 overflow 가 나므로 경계에서 거른다.
+MIN_DATE = date(1970, 1, 1)
+MAX_DATE = date(2100, 12, 31)
 TargetDate = Annotated[
     date | None,
-    Query(description="기준 날짜(YYYY-MM-DD). 생략하면 오늘(한국 시각)이다."),
+    Query(
+        ge=MIN_DATE,
+        le=MAX_DATE,
+        description=(
+            "기준 날짜(YYYY-MM-DD). 1970-01-01부터 2100-12-31까지다. "
+            "생략하면 오늘(한국 시각)이다."
+        ),
+    ),
 ]
 
 

@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     school_base_url: AnyHttpUrl = AnyHttpUrl("http://smart.tukorea.ac.kr")
     library_base_url: AnyHttpUrl = AnyHttpUrl("https://library.tukorea.ac.kr")
-    school_request_timeout_seconds: float = Field(default=10, gt=0)
+    school_request_timeout_seconds: float = Field(default=3, gt=0)
     guide_request_timeout_seconds: float = Field(default=12, gt=0)
     # 참이면 lifespan 에서 주기 수집 태스크를 띄운다. DB 없이 띄울 때는 끈다.
     collection_enabled: bool = True

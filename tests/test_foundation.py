@@ -74,6 +74,14 @@ def test_invalid_runtime_limits_are_rejected(field: str, value: int) -> None:
         Settings(_env_file=None, postgres_password="test-password", **{field: value})
 
 
+def test_school_request_timeout_defaults_to_three_seconds() -> None:
+    from app.config.settings import Settings
+
+    settings = Settings(_env_file=None, postgres_password="test-password")
+
+    assert settings.school_request_timeout_seconds == 3
+
+
 def test_collection_delay_must_exceed_interval() -> None:
     from app.config.settings import Settings
 
