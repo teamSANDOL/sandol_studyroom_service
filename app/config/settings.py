@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
     api_docs_enabled: bool = False
+    # 참이면 개발용 프론트엔드(/studyroom/ 과 static)를 제공한다. 운영에서는 끈다.
+    development_frontend_mode: bool = False
     cors_allowed_origins: list[str] = Field(default_factory=list)
 
     postgres_db: str = Field(default="studyroom_service", min_length=1)
@@ -39,11 +41,14 @@ class Settings(BaseSettings):
 
     school_base_url: AnyHttpUrl = AnyHttpUrl("http://smart.tukorea.ac.kr")
     library_base_url: AnyHttpUrl = AnyHttpUrl("https://library.tukorea.ac.kr")
-    school_request_timeout_seconds: float = Field(default=10, gt=0)
+    school_request_timeout_seconds: float = Field(default=3, gt=0)
     guide_request_timeout_seconds: float = Field(default=12, gt=0)
-    collection_interval_seconds: int = Field(default=60, gt=0)
+    # 참이면 lifespan 에서 주기 수집 태스크를 띄운다. DB 없이 띄울 때는 끈다.
+    collection_enabled: bool = True
+    # 학교 좌석 시스템을 수집해 DB에 적재하는 주기다.
+    collection_interval_minutes: int = Field(default=3, gt=0)
     history_retention_days: int = Field(default=90, gt=0)
-    collection_stale_after_seconds: int = Field(default=180, gt=0)
+    collection_stale_after_minutes: int = Field(default=7, gt=0)
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -60,9 +65,9 @@ class Settings(BaseSettings):
         redis = urlsplit(self.redis_url.get_secret_value())
         if redis.scheme not in {"redis", "rediss"} or not redis.hostname:
             raise ValueError("REDIS_URL must use redis:// or rediss:// with a host")
-        if self.collection_stale_after_seconds <= self.collection_interval_seconds:
+        if self.collection_stale_after_minutes <= self.collection_interval_minutes:
             raise ValueError(
-                "COLLECTION_STALE_AFTER_SECONDS must exceed COLLECTION_INTERVAL_SECONDS"
+                "COLLECTION_STALE_AFTER_MINUTES must exceed COLLECTION_INTERVAL_MINUTES"
             )
         return self
 
