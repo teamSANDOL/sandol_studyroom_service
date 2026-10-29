@@ -94,8 +94,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         school_client,
         LiveCache(redis, config.redis_key_prefix, config.live_cache_ttl_seconds),
     )
+    # 응답 cache 수명은 수집 주기와 같다. 새 관측이 들어오기 전에는 답이 바뀌지 않는다.
+    history_cache = LiveCache(
+        redis,
+        f"{config.redis_key_prefix}:history",
+        config.collection_interval_minutes * 60,
+    )
     app.state.history = (
-        HistoryService(session_factory, config) if session_factory is not None else None
+        HistoryService(session_factory, config, cache=history_cache)
+        if session_factory is not None
+        else None
     )
     app.add_exception_handler(ServiceError, handle_service_error)
     # 개발용 프론트엔드는 모드가 켜진 경우에만 등록한다. 꺼지면 경로가 없어 404다.

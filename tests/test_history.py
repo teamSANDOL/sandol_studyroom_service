@@ -1,13 +1,17 @@
 """혼잡도 통계 집계와 조회 서비스를 검증한다."""
 
 import os
+import threading
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, timedelta, timezone
+from typing import Any
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config.settings import Settings
+from app.main import create_app
 from app.models import Base, CollectorState, Readingroom, ReadingroomObservation
 from app.schemas.history import (
     DailyHistoryReason,
@@ -16,6 +20,7 @@ from app.schemas.history import (
     WeeklyHistoryReason,
 )
 from app.schemas.readingroom import ReadingroomCode
+from app.services import history as history_module
 from app.services.history import (
     HistoryContext,
     HistoryService,
@@ -24,6 +29,7 @@ from app.services.history import (
     build_monthly,
     build_weekly,
 )
+from app.services.live_cache import LiveCache
 
 KST = timezone(timedelta(hours=9))
 
@@ -180,6 +186,193 @@ def test_metadata_reports_collection_delay() -> None:
     assert never.collection_delayed is True
     assert never.first_date is None
     assert never.interval_seconds == 180
+
+
+# ---------- DB 없이: 비동기 실행, cache, date 범위 ----------
+
+NOW = datetime(2026, 10, 13, 12, 0, tzinfo=KST)
+
+
+class MemoryBackend:
+    def __init__(self) -> None:
+        self.values: dict[str, str] = {}
+
+    async def get(self, name: str) -> str | None:
+        return self.values.get(name)
+
+    async def set(self, name: str, value: str, ex: int) -> bool:
+        self.values[name] = value
+        return True
+
+
+class FakeSession:
+    async def __aenter__(self) -> "FakeSession":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+
+def make_settings(**overrides: Any) -> Settings:
+    base: dict[str, Any] = {"_env_file": None, "postgres_password": "test-password"}
+    return Settings(**base, **overrides)
+
+
+def offline_service(
+    monkeypatch: pytest.MonkeyPatch, cache: LiveCache | None = None
+) -> HistoryService:
+    """DB 조회를 빈 결과로 바꾼 서비스다. 집계와 cache 동작만 본다."""
+    service = HistoryService(
+        FakeSession,  # type: ignore[arg-type]
+        make_settings(),
+        clock=lambda: NOW.astimezone(UTC),
+        cache=cache,
+    )
+
+    async def no_points(*_: object) -> list[ObservationPoint]:
+        return []
+
+    async def fixed_context(_: object, now: datetime) -> HistoryContext:
+        return context(now, first_date=date(2026, 7, 1), last_stored_at=now)
+
+    monkeypatch.setattr(service, "_fetch", no_points)
+    monkeypatch.setattr(service, "_context", fixed_context)
+    return service
+
+
+def spy_on(monkeypatch: pytest.MonkeyPatch, name: str) -> list[str]:
+    """집계 함수가 불린 thread 이름을 모은다."""
+    threads: list[str] = []
+    original = getattr(history_module, name)
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        threads.append(threading.current_thread().name)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(history_module, name, spy)
+    return threads
+
+
+async def test_aggregation_runs_off_the_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = offline_service(monkeypatch)
+    threads = spy_on(monkeypatch, "build_monthly")
+
+    await service.monthly(ReadingroomCode.A1, date(2026, 10, 13))
+
+    assert threads
+    assert threads[0] != threading.current_thread().name
+
+
+async def test_repeated_request_is_served_from_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = offline_service(monkeypatch, LiveCache(MemoryBackend(), "t", 180))
+    threads = spy_on(monkeypatch, "build_daily")
+
+    first = await service.daily(ReadingroomCode.A1, date(2026, 10, 13))
+    second = await service.daily(ReadingroomCode.A1, date(2026, 10, 13))
+
+    assert len(threads) == 1
+    assert second.model_dump(by_alias=True) == first.model_dump(by_alias=True)
+
+
+async def test_dates_outside_retention_bypass_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = MemoryBackend()
+    service = offline_service(monkeypatch, LiveCache(backend, "t", 180))
+    threads = spy_on(monkeypatch, "build_daily")
+
+    for _ in range(2):
+        await service.daily(ReadingroomCode.A1, date(2000, 1, 1))
+
+    assert len(threads) == 2
+    assert backend.values == {}
+
+
+@pytest.mark.parametrize(
+    ("period", "builder", "first_day", "second_day"),
+    [
+        ("weekly", "build_weekly", date(2026, 10, 12), date(2026, 10, 13)),
+        ("monthly", "build_monthly", date(2026, 10, 1), date(2026, 10, 13)),
+    ],
+)
+async def test_period_cache_is_shared_but_echoes_each_requested_date(
+    monkeypatch: pytest.MonkeyPatch,
+    period: str,
+    builder: str,
+    first_day: date,
+    second_day: date,
+) -> None:
+    service = offline_service(monkeypatch, LiveCache(MemoryBackend(), "t", 180))
+    threads = spy_on(monkeypatch, builder)
+    call = getattr(service, period)
+
+    first = await call(ReadingroomCode.A1, first_day)
+    second = await call(ReadingroomCode.A1, second_day)
+
+    assert len(threads) == 1
+    assert (first.date, second.date) == (first_day, second_day)
+
+
+@pytest.mark.parametrize("target", [date(1970, 1, 1), date(2100, 12, 31)])
+async def test_service_handles_boundary_dates(
+    monkeypatch: pytest.MonkeyPatch, target: date
+) -> None:
+    service = offline_service(monkeypatch)
+
+    for call in (service.daily, service.weekly, service.monthly):
+        result = await call(ReadingroomCode.A1, target)
+        assert result.date == target
+
+
+class StubHistory:
+    """라우터가 서비스까지 요청을 넘겼는지만 센다."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def _respond(self, build: Any, room: ReadingroomCode, target: date) -> Any:
+        self.calls += 1
+        return build([], HistoryRoomCode(room.value), target, context(NOW))
+
+    async def daily(self, room: ReadingroomCode, target: date) -> Any:
+        return await self._respond(build_daily, room, target)
+
+    async def weekly(self, room: ReadingroomCode, target: date) -> Any:
+        return await self._respond(build_weekly, room, target)
+
+    async def monthly(self, room: ReadingroomCode, target: date) -> Any:
+        return await self._respond(build_monthly, room, target)
+
+
+@pytest.mark.parametrize("period", ["daily", "weekly", "monthly"])
+@pytest.mark.parametrize(
+    ("value", "status"),
+    [
+        ("1969-12-31", 422),
+        ("1970-01-01", 200),
+        ("2100-12-31", 200),
+        ("2101-01-01", 422),
+    ],
+)
+async def test_date_query_is_limited_to_1970_through_2100(
+    period: str, value: str, status: int
+) -> None:
+    app = create_app(make_settings(collection_enabled=False))
+    stub = StubHistory()
+    app.state.history = stub
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            f"/studyroom/api/readingrooms/A1/history/{period}", params={"date": value}
+        )
+
+    assert response.status_code == status
+    assert stub.calls == (1 if status == 200 else 0)
 
 
 # ---------- DB 통합: TEST_DATABASE_URL 이 있을 때만 ----------
