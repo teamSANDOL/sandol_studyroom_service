@@ -32,6 +32,7 @@ async def test_page_serves_linked_assets_without_external_connections() -> None:
         postgres_password="test-password",
         postgres_host="unreachable.invalid",
         redis_url="redis://unreachable.invalid:6379/0",
+        development_frontend_mode=True,
     )
     async with AsyncClient(
         transport=ASGITransport(app=create_app(settings)), base_url="http://test"
@@ -40,7 +41,7 @@ async def test_page_serves_linked_assets_without_external_connections() -> None:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
         assert response.headers["cache-control"] == "no-store"
-        assert "예시 데이터" in response.text
+        assert "열람실 현황" in response.text
         parser = AssetParser()
         parser.feed(response.text)
         assert len(parser.assets) == 2
@@ -49,4 +50,21 @@ async def test_page_serves_linked_assets_without_external_connections() -> None:
             assert asset.status_code == 200
             assert asset.content
         assert (await client.get("/studyroom/static/missing.js")).status_code == 404
+        assert (await client.get("/studyroom/health")).json() == {"status": "ok"}
+
+
+async def test_frontend_is_hidden_when_development_mode_is_off() -> None:
+    settings = Settings(
+        _env_file=None,
+        postgres_password="test-password",
+        postgres_host="unreachable.invalid",
+        redis_url="redis://unreachable.invalid:6379/0",
+        development_frontend_mode=False,
+    )
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app(settings)), base_url="http://test"
+    ) as client:
+        assert (await client.get("/studyroom/")).status_code == 404
+        assert (await client.get("/studyroom/static/js/app.js")).status_code == 404
+        # API 와 health 는 모드와 무관하게 열려 있다.
         assert (await client.get("/studyroom/health")).json() == {"status": "ok"}
