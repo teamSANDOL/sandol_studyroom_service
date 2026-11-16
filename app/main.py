@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
 
-from app.classroom.router import router as classroom_router
+from app.classroom.routers.classroom import router as classroom_router
 from app.core.cache import LiveCache
 from app.core.config import Settings
 from app.core.database import create_db_engine, create_session_factory, run_migrations
@@ -41,7 +41,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     school_client = SchoolClient(school_http)
     redis = Redis.from_url(config.redis_url.get_secret_value())
-    # DB 는 classroom 도 쓰므로 항상 연결한다. 수집 설정은 collector 와 이력 API 만 켠다.
+    # classroom 도 DB 를 쓰므로 항상 연결한다.
+    # 수집 설정은 collector 와 이력 API 만 켠다.
     engine = create_db_engine(config.sqlalchemy_url)
     session_factory = create_session_factory(engine)
 

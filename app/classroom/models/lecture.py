@@ -1,53 +1,16 @@
-"""건물, 강의실, 강의와 수업 시간 테이블이다."""
+"""강의와 강의의 수업 시간을 저장하는 모델이다."""
 
 from sqlalchemy import (
-    ARRAY,
     CheckConstraint,
     ForeignKey,
     Index,
     SmallInteger,
     String,
     UniqueConstraint,
-    text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.models import domain_metadata
-
-SCHEMA = "classroom"
-
-
-class Base(DeclarativeBase):
-    """classroom 스키마에 테이블을 두는 모델 기반이다."""
-
-    metadata = domain_metadata(SCHEMA)
-
-
-class Building(Base):
-    """강의실이 있는 건물과 사용자가 부르는 별칭이다."""
-
-    __tablename__ = "buildings"
-
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
-    # 강의실 이름의 앞부분이다. 예: A동, 중앙
-    name: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
-    aliases: Mapped[list[str]] = mapped_column(
-        ARRAY(String(20)), nullable=False, server_default=text("'{}'")
-    )
-
-
-class Classroom(Base):
-    """건물 안의 강의실 하나다."""
-
-    __tablename__ = "classrooms"
-    __table_args__ = (UniqueConstraint("building_id", "room"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    building_id: Mapped[int] = mapped_column(
-        ForeignKey("buildings.id", ondelete="RESTRICT"), nullable=False
-    )
-    # 건물명을 뺀 나머지다. 예: 218호, 416-A호
-    room: Mapped[str] = mapped_column(String(20), nullable=False)
+from app.classroom.models.base import Base
 
 
 class Lecture(Base):
