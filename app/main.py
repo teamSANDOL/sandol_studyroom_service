@@ -6,35 +6,26 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
 
-from app.clients.school import SchoolClient, create_school_http
-from app.config.settings import Settings
-from app.database import create_db_engine, create_session_factory, init_database
-from app.errors import ServiceError
-from app.routers.history import router as history_router
-from app.routers.readingroom import router as readingroom_router
-from app.routers.web import router as web_router
-from app.services.collector import run_collector
-from app.services.history import HistoryService
-from app.services.live_cache import LiveCache
-from app.services.readingroom import ReadingroomService
+from app.core.cache import LiveCache
+from app.core.config import Settings
+from app.core.database import create_db_engine, create_session_factory
+from app.core.errors import ServiceError, handle_service_error
+from app.studyroom.clients.school import SchoolClient, create_school_http
+from app.studyroom.database import init_database
+from app.studyroom.routers.history import router as history_router
+from app.studyroom.routers.readingroom import router as readingroom_router
+from app.studyroom.routers.web import router as web_router
+from app.studyroom.services.collector import run_collector
+from app.studyroom.services.history import HistoryService
+from app.studyroom.services.readingroom import ReadingroomService
 
 # gateway 가 경로를 그대로 넘기므로 서비스가 prefix 를 직접 가진다.
 PATH_PREFIX = "/studyroom"
-
-
-async def handle_service_error(_: Request, error: Exception) -> JSONResponse:
-    assert isinstance(error, ServiceError)
-    return JSONResponse(
-        status_code=error.status_code,
-        content={"error": error.message, "code": error.code},
-        headers={"Cache-Control": "no-store"},
-    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -110,7 +101,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if config.development_frontend_mode:
         app.mount(
             f"{PATH_PREFIX}/static",
-            StaticFiles(directory=Path(__file__).resolve().parent / "static"),
+            StaticFiles(
+                directory=Path(__file__).resolve().parent / "studyroom" / "static"
+            ),
             name="static",
         )
         app.include_router(web_router, prefix=PATH_PREFIX)
