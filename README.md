@@ -2,7 +2,7 @@
 
 ## 현재 구성
 
-Docker Compose는 FastAPI, PostgreSQL 15, Redis 7.4를 실행한다. FastAPI는 환경 변수를 검증하고 `/studyroom/health`와 열람실 현재 현황 API를 제공한다. 열람실 현황은 요청 시 학교 좌석 시스템을 조회하고 Redis에 짧게 cache한다. 스터디룸 조회, collector와 DB migration은 후속 구현 대상이다. API 형식은 [API 문서](docs/api.md), 학교 응답 해석은 [수집 정보](docs/studyroom-info.md)에 기록한다.
+Docker Compose는 FastAPI, PostgreSQL 15, Redis 7.4를 실행한다. FastAPI는 환경 변수를 검증하고 `/studyroom/health`와 열람실 현재 현황 API를 제공한다. 열람실 현황은 요청 시 학교 좌석 시스템을 조회하고 Redis에 짧게 cache한다. collector 는 열람실 혼잡도를 주기적으로 DB 에 적재한다. 스터디룸 조회는 후속 구현 대상이다. API 형식은 [API 문서](docs/api.md), 학교 응답 해석은 [수집 정보](docs/studyroom-info.md)에 기록한다.
 
 API는 localhost의 8000 포트를 사용하고 모든 경로를 `/studyroom` 아래에 둔다. 통합 gateway 가 경로를 그대로 넘기기 때문이다. DB와 Redis는 Compose 내부 네트워크에서 연결하며 DB 기록은 named volume에 보관한다. Redis는 재시작하면 cache를 비운다.
 
@@ -27,6 +27,17 @@ curl --fail http://127.0.0.1:8000/studyroom/health
 
 `POSTGRES_HOST`와 `REDIS_URL`의 예시 hostname은 Compose 내부용이다. 명시한 `DATABASE_URL`은 `POSTGRES_*`보다 우선하며 빈 값이면 앱이 해당 필드로 연결 URL을 구성한다.
 
+## 코드 구조와 DB
+
+`app/` 은 도메인별 패키지로 나뉜다. `app/core` 는 설정, DB 연결, 공용 오류와 schema 를 가진다. `app/studyroom` 은 열람실과 스터디룸 코드를 가진다. 도메인 패키지는 `app.core` 와 자기 자신만 import 한다. `tests/test_boundaries.py` 가 이 규칙을 검사한다.
+
+DB 테이블은 도메인마다 PostgreSQL 스키마를 따로 쓴다. 열람실 테이블은 `studyroom` 스키마에 있다. 스키마 변경은 `app/migrations` 의 alembic migration 으로 관리하고, 앱은 시작할 때 `upgrade head` 를 적용한다. 모델을 바꾼 개발자는 DB 를 띄운 상태에서 migration 을 만든다.
+
+```bash
+uv run alembic revision --autogenerate -m "변경 내용"
+uv run alembic check
+```
+
 ## 개발 검증
 
 프로젝트는 Python 3.11과 uv를 사용한다. 개발자는 lock 기준으로 의존성을 설치하고 검증한다.
@@ -38,6 +49,8 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy app
 ```
+
+DB 통합 테스트와 migration 테스트는 `TEST_DATABASE_URL` 이 있을 때만 돈다. 테스트는 그 DB 의 스키마를 지우고 다시 만들므로 빈 테스트용 DB 를 쓴다.
 
 ## 종료
 
