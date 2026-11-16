@@ -8,17 +8,12 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.cache import LiveCache
 from app.core.config import Settings
 from app.main import create_app
-from app.studyroom.models import (
-    Base,
-    CollectorState,
-    Readingroom,
-    ReadingroomObservation,
-)
+from app.studyroom.models import CollectorState, Readingroom, ReadingroomObservation
 from app.studyroom.schemas.history import (
     DailyHistoryReason,
     HistoryRoomCode,
@@ -389,12 +384,10 @@ needs_db = pytest.mark.skipif(
 
 
 @pytest.fixture
-async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(str(DB_URL))
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    value: async_sessionmaker[AsyncSession] = async_sessionmaker(engine)
+async def factory(
+    db_engine: AsyncEngine,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    value: async_sessionmaker[AsyncSession] = async_sessionmaker(db_engine)
     async with value() as session:
         session.add(Readingroom(code="A1", name="1일반열람실"))
         minute = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)  # 한국 14시
@@ -412,7 +405,6 @@ async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         session.add(CollectorState(id=1, last_stored_at=minute))
         await session.commit()
     yield value
-    await engine.dispose()
 
 
 @needs_db

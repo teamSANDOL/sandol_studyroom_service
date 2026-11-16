@@ -13,10 +13,10 @@ from redis.asyncio import Redis
 
 from app.core.cache import LiveCache
 from app.core.config import Settings
-from app.core.database import create_db_engine, create_session_factory
+from app.core.database import create_db_engine, create_session_factory, run_migrations
 from app.core.errors import ServiceError, handle_service_error
 from app.studyroom.clients.school import SchoolClient, create_school_http
-from app.studyroom.database import init_database
+from app.studyroom.database import seed_readingrooms
 from app.studyroom.routers.history import router as history_router
 from app.studyroom.routers.readingroom import router as readingroom_router
 from app.studyroom.routers.web import router as web_router
@@ -49,7 +49,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         task: asyncio.Task[None] | None = None
         if engine is not None:
-            await init_database(engine)
+            await run_migrations(engine)
+            await seed_readingrooms(engine)
         if session_factory is not None:
             task = asyncio.create_task(
                 run_collector(

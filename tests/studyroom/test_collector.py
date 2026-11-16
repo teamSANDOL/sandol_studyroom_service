@@ -10,15 +10,10 @@ import httpx
 import pytest
 import respx
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.studyroom.clients.school import COUNTS_PATH, SchoolClient
-from app.studyroom.models import (
-    Base,
-    CollectorState,
-    Readingroom,
-    ReadingroomObservation,
-)
+from app.studyroom.models import CollectorState, Readingroom, ReadingroomObservation
 from app.studyroom.services.collector import cleanup_once, collect_once
 
 BASE_URL = "http://school.test"
@@ -35,12 +30,8 @@ MINUTE = NOW.replace(second=0, microsecond=0)
 
 
 @pytest.fixture
-async def session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(str(DB_URL))
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(engine)
+async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(db_engine)
     async with factory() as value:
         for code, name in [
             ("A1", "1일반열람실"),
@@ -50,7 +41,6 @@ async def session() -> AsyncIterator[AsyncSession]:
             value.add(Readingroom(code=code, name=name))
         await value.commit()
         yield value
-    await engine.dispose()
 
 
 @pytest.fixture
