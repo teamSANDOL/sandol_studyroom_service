@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from app.core.database import run_migrations
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
-DOMAIN_SCHEMAS = ("studyroom",)
+DOMAIN_SCHEMAS = ("studyroom", "classroom")
 
 
 async def reset_database(engine: AsyncEngine) -> None:

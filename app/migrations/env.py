@@ -6,11 +6,12 @@ from alembic import context
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.classroom.models import Base as ClassroomBase
 from app.core.config import Settings
 from app.studyroom.models import Base as StudyroomBase
 
 # 도메인을 추가하면 그 Base.metadata 를 여기에 더한다.
-target_metadata = [StudyroomBase.metadata]
+target_metadata = [StudyroomBase.metadata, ClassroomBase.metadata]
 
 
 def _run(connection: Connection) -> None:

@@ -8,6 +8,7 @@ from alembic.migration import MigrationContext
 from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from app.classroom.models import Base as ClassroomBase
 from app.core.database import run_migrations
 from app.studyroom.models import Base as StudyroomBase
 from tests.conftest import TEST_DATABASE_URL, reset_database
@@ -49,7 +50,10 @@ def _diff(connection: Connection) -> list[object]:
     context = MigrationContext.configure(
         connection, opts={"include_schemas": True, "compare_type": True}
     )
-    return list(compare_metadata(context, StudyroomBase.metadata))
+    # 도메인 metadata 를 함께 넘겨야 서로의 테이블을 지울 대상으로 보지 않는다.
+    # alembic 은 목록도 받지만 타입 힌트는 MetaData 하나로만 적혀 있다.
+    metadata = [StudyroomBase.metadata, ClassroomBase.metadata]
+    return list(compare_metadata(context, metadata))  # type: ignore[arg-type]
 
 
 async def _table_schemas(engine: AsyncEngine, name: str) -> list[str]:
