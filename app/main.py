@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
 
+from app.classroom.router import router as classroom_router
 from app.core.cache import LiveCache
 from app.core.config import Settings
 from app.core.database import create_db_engine, create_session_factory, run_migrations
@@ -24,8 +25,9 @@ from app.studyroom.services.collector import run_collector
 from app.studyroom.services.history import HistoryService
 from app.studyroom.services.readingroom import ReadingroomService
 
-# gateway 가 경로를 그대로 넘기므로 서비스가 prefix 를 직접 가진다.
+# gateway 가 경로를 그대로 넘기므로 서비스가 도메인별 prefix 를 직접 가진다.
 PATH_PREFIX = "/studyroom"
+CLASSROOM_PREFIX = "/classroom"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -110,6 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.include_router(web_router, prefix=PATH_PREFIX)
     app.include_router(readingroom_router, prefix=PATH_PREFIX)
     app.include_router(history_router, prefix=PATH_PREFIX)
+    app.include_router(classroom_router, prefix=CLASSROOM_PREFIX)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_allowed_origins,
