@@ -41,19 +41,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     school_client = SchoolClient(school_http)
     redis = Redis.from_url(config.redis_url.get_secret_value())
-    # DB 연결은 수집을 켠 경우에만 만든다. 통계 API 도 이 연결에 의존한다.
-    engine = (
-        create_db_engine(config.sqlalchemy_url) if config.collection_enabled else None
-    )
-    session_factory = create_session_factory(engine) if engine is not None else None
+    # DB 는 classroom 도 쓰므로 항상 연결한다. 수집 설정은 collector 와 이력 API 만 켠다.
+    engine = create_db_engine(config.sqlalchemy_url)
+    session_factory = create_session_factory(engine)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         task: asyncio.Task[None] | None = None
-        if engine is not None:
-            await run_migrations(engine)
-            await seed_readingrooms(engine)
-        if session_factory is not None:
+        await run_migrations(engine)
+        await seed_readingrooms(engine)
+        if config.collection_enabled:
             task = asyncio.create_task(
                 run_collector(
                     session_factory,
@@ -71,8 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await task
             await school_http.aclose()
             await redis.aclose()
-            if engine is not None:
-                await engine.dispose()
+            await engine.dispose()
 
     app = FastAPI(
         title="Sandol Studyroom Service",
@@ -96,7 +92,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.history = (
         HistoryService(session_factory, config, cache=history_cache)
-        if session_factory is not None
+        if config.collection_enabled
         else None
     )
     app.add_exception_handler(ServiceError, handle_service_error)

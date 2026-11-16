@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     library_base_url: AnyHttpUrl = AnyHttpUrl("https://library.tukorea.ac.kr")
     school_request_timeout_seconds: float = Field(default=3, gt=0)
     guide_request_timeout_seconds: float = Field(default=12, gt=0)
-    # 참이면 lifespan 에서 주기 수집 태스크를 띄운다. DB 없이 띄울 때는 끈다.
+    # 참이면 열람실 주기 수집과 이력 API 를 켠다. DB 연결은 이 값과 상관없이 필요하다.
     collection_enabled: bool = True
     # 학교 좌석 시스템을 수집해 DB에 적재하는 주기다.
     collection_interval_minutes: int = Field(default=3, gt=0)
