@@ -36,12 +36,13 @@ class LectureSlot(Base):
             "0 <= start_minute AND start_minute < end_minute AND end_minute <= 1440",
             name="minute_range",
         ),
+        CheckConstraint("period_start <= period_end", name="period_range"),
         Index("ix_lecture_slots_classroom_id_day", "classroom_id", "day"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     lecture_id: Mapped[int] = mapped_column(
-        ForeignKey("lectures.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("lectures.id", ondelete="CASCADE"), nullable=False, index=True
     )
     # 온라인 강좌, 미배정처럼 강의실이 아닌 장소는 NULL 이다.
     classroom_id: Mapped[int | None] = mapped_column(

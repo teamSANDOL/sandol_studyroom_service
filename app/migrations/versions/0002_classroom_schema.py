@@ -76,6 +76,9 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "day BETWEEN 0 AND 6", name=op.f("ck_lecture_slots_day_range")
         ),
+        sa.CheckConstraint(
+            "period_start <= period_end", name=op.f("ck_lecture_slots_period_range")
+        ),
         sa.ForeignKeyConstraint(
             ["classroom_id"],
             ["classroom.classrooms.id"],
@@ -98,9 +101,21 @@ def upgrade() -> None:
         unique=False,
         schema="classroom",
     )
+    op.create_index(
+        op.f("ix_lecture_slots_lecture_id"),
+        "lecture_slots",
+        ["lecture_id"],
+        unique=False,
+        schema="classroom",
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        op.f("ix_lecture_slots_lecture_id"),
+        table_name="lecture_slots",
+        schema="classroom",
+    )
     op.drop_index(
         "ix_lecture_slots_classroom_id_day",
         table_name="lecture_slots",
