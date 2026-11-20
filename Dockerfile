@@ -26,6 +26,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --chown=app:app alembic.ini /app/alembic.ini
 COPY --chown=app:app app/ /app/app/
 
 USER app:app

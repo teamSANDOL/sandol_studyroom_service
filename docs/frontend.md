@@ -6,10 +6,10 @@ FastAPI는 `/studyroom/`에서 API 동작을 확인하는 개발용 페이지를
 
 ## 파일 역할
 
-- `app/routers/web.py`는 HTML 파일을 응답한다.
-- `app/template/index.html`은 확인 영역을 정의한다.
-- `app/static/js/app.js`는 API를 요청하고 카드, 좌석 칸, 통계 그래프를 그린다.
-- `app/static/css/style.css`는 카드와 좌석 칸, 통계 그래프의 스타일이다.
+- `app/studyroom/routers/web.py`는 HTML 파일을 응답한다.
+- `app/studyroom/template/index.html`은 확인 영역을 정의한다.
+- `app/studyroom/static/js/app.js`는 API를 요청하고 카드, 좌석 칸, 통계 그래프를 그린다.
+- `app/studyroom/static/css/style.css`는 카드와 좌석 칸, 통계 그래프의 스타일이다.
 
 ## 기능
 

@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 @pytest.fixture(autouse=True)
 def isolate_settings_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     for name in tuple(os.environ):
         if name.lower() in Settings.model_fields:
@@ -17,7 +17,7 @@ def isolate_settings_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_component_database_url_preserves_password() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     settings = Settings(
         _env_file=None,
@@ -35,7 +35,7 @@ def test_component_database_url_preserves_password() -> None:
 
 
 def test_explicit_database_url_takes_precedence() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     settings = Settings(
         _env_file=None,
@@ -52,7 +52,7 @@ def test_explicit_database_url_takes_precedence() -> None:
 
 
 def test_missing_database_password_is_rejected() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     with pytest.raises(ValidationError, match="POSTGRES_PASSWORD"):
         Settings(_env_file=None, database_url=None, postgres_password=None)
@@ -68,14 +68,14 @@ def test_missing_database_password_is_rejected() -> None:
     ],
 )
 def test_invalid_runtime_limits_are_rejected(field: str, value: int) -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None, postgres_password="test-password", **{field: value})
 
 
 def test_school_request_timeout_defaults_to_three_seconds() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     settings = Settings(_env_file=None, postgres_password="test-password")
 
@@ -83,7 +83,7 @@ def test_school_request_timeout_defaults_to_three_seconds() -> None:
 
 
 def test_collection_delay_must_exceed_interval() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
 
     with pytest.raises(ValidationError, match="COLLECTION_STALE_AFTER_MINUTES"):
         Settings(
@@ -95,7 +95,7 @@ def test_collection_delay_must_exceed_interval() -> None:
 
 
 async def test_health_does_not_require_dependency_connections() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
     from app.main import create_app
 
     settings = Settings(
@@ -116,7 +116,7 @@ async def test_health_does_not_require_dependency_connections() -> None:
 
 
 async def test_api_docs_can_be_enabled() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
     from app.main import create_app
 
     settings = Settings(
@@ -130,7 +130,7 @@ async def test_api_docs_can_be_enabled() -> None:
 
 
 async def test_cors_accepts_only_the_configured_frontend() -> None:
-    from app.config.settings import Settings
+    from app.core.config import Settings
     from app.main import create_app
 
     settings = Settings(
